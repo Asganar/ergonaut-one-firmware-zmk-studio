@@ -88,16 +88,16 @@ layers:
   - {t: ▽, type: trans}
   lower:
   - {t: CAPSLOCK, h: Gui}
-  - '&my_rs N1'
-  - '&my_rs N2'
-  - '&my_rs N3'
-  - '&my_rs N4'
-  - '&my_rs N5'
-  - '&my_rs N6'
-  - '&my_rs N7'
-  - '&my_rs N8'
-  - '&my_rs N9'
-  - '&my_rs N0'
+  - '&my_rs_c N1'
+  - '&my_rs_c N2'
+  - '&my_rs_c N3'
+  - '&my_rs_c N4'
+  - '&my_rs_c N5'
+  - '&my_rs_c N6'
+  - '&my_rs_c N7'
+  - '&my_rs_c N8'
+  - '&my_rs_c N9'
+  - '&my_rs_c N0'
   - BACKSPACE
   - LEFT ALT
   - '1'
@@ -112,11 +112,11 @@ layers:
   - '0'
   - RIGHT ALT
   - LEFT CONTROL
-  - '&my_rs BACKSLASH'
-  - '&my_rs MINUS'
+  - '&my_rs_c BACKSLASH'
+  - '&my_rs_c MINUS'
   - '='
   - '-'
-  - '&my_rs EQUAL'
+  - '&my_rs_c EQUAL'
   - '['
   - ']'
   - \
