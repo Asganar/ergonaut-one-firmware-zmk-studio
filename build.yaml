@@ -6,5 +6,6 @@ include:
     artifact-name: ergonaut_one_left_studio
   - board: seeeduino_xiao_ble
     shield: ergonaut_one_right
+    cmake-args: -DCONFIG_ZMK_USB=n
   - board: seeeduino_xiao_ble
     shield: settings_reset

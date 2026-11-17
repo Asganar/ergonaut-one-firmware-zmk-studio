@@ -6,88 +6,66 @@ permissions:
   contents: read
 
 jobs:
-  matrix:
-    runs-on: ubuntu-24.04
-    outputs:
-      targets: ${{ steps.targets.outputs.matrix }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - name: Read build targets
-        id: targets
-        run: echo "matrix=$(yq -oj -I0 build.yaml)" >> "$GITHUB_OUTPUT"
-
   build:
-    needs: matrix
     runs-on: ubuntu-24.04
     container:
       image: zmkfirmware/zmk-build-arm:stable
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.matrix.outputs.targets) }}
     defaults:
       run:
         shell: bash
-    env:
-      ZMK_DEPENDENCIES: |
-        bootloader/
-        modules/
-        tools/
-        zephyr/
-        zmk/
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Restore ZMK dependencies
-        id: dependencies
-        uses: actions/cache/restore@v6
+      - name: Cache ZMK dependencies
+        uses: actions/cache@v6
         with:
-          path: ${{ env.ZMK_DEPENDENCIES }}
+          path: |
+            bootloader/
+            modules/
+            tools/
+            zephyr/
+            zmk/
           key: zmk-deps-${{ hashFiles('config/west.yml') }}
       - name: Prepare the ZMK workspace
         run: |
           west init -l config
           west update --fetch-opt=--filter=tree:0
           west zephyr-export
-      - name: Build the UF2
-        env:
-          BOARD: ${{ matrix.board }}
-          SHIELD: ${{ matrix.shield }}
-          SNIPPET: ${{ matrix.snippet }}
-          CMAKE_ARGUMENTS: ${{ matrix.cmake-args }}
-          ARTIFACT_NAME: ${{ matrix.artifact-name || format('{0}-{1}-zmk', matrix.shield, matrix.board) }}
+      - name: Build the UF2 files
         run: |
-          west_args=()
-          if [[ -n "$SNIPPET" ]]; then
-            west_args+=(-S "$SNIPPET")
-          fi
-          read -r -a cmake_args <<< "$CMAKE_ARGUMENTS"
-          west build -s zmk/app -d "$RUNNER_TEMP/zmk-build" -b "$BOARD" "${west_args[@]}" -- \
-            "-DZMK_CONFIG=$GITHUB_WORKSPACE/config" "-DSHIELD=$SHIELD" "${cmake_args[@]}"
-          mkdir -p firmware-files
-          cp "$RUNNER_TEMP/zmk-build/zephyr/zmk.uf2" "firmware-files/$ARTIFACT_NAME.uf2"
-      - name: Upload the UF2
+          python3 - <<'PY'
+          import shlex
+          import shutil
+          import subprocess
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+
+          import yaml
+
+          config_path = Path("config").resolve()
+          targets = yaml.safe_load(Path("build.yaml").read_text())["include"]
+          firmware_path = Path("firmware-files")
+          firmware_path.mkdir()
+
+          for target in targets:
+              board = target["board"]
+              shield = target["shield"]
+              name = target.get("artifact-name", f"{shield}-{board}-zmk")
+              cmake_args = shlex.split(target.get("cmake-args", ""))
+              with TemporaryDirectory(prefix="zmk-") as build_path:
+                  command = ["west", "build", "-s", "zmk/app", "-d", build_path, "-b", board]
+                  if snippet := target.get("snippet"):
+                      command.extend(["-S", snippet])
+                  command.extend(["--", f"-DZMK_CONFIG={config_path}", f"-DSHIELD={shield}"])
+                  subprocess.run([*command, *cmake_args], check=True)
+                  shutil.copyfile(
+                      Path(build_path) / "zephyr" / "zmk.uf2", firmware_path / f"{name}.uf2"
+                  )
+          PY
+      - name: Publish firmware archive
         uses: actions/upload-artifact@v7
         with:
-          name: firmware-part-${{ strategy.job-index }}
+          name: firmware
           path: firmware-files/*.uf2
           if-no-files-found: error
-      - name: Save ZMK dependencies
-        if: github.event_name != 'pull_request' && strategy.job-index == 0 && steps.dependencies.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ env.ZMK_DEPENDENCIES }}
-          key: ${{ steps.dependencies.outputs.cache-primary-key }}
-
-  merge:
-    needs: build
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Publish firmware archive
-        uses: actions/upload-artifact/merge@v7
-        with:
-          name: firmware
-          pattern: firmware-part-*
-          delete-merged: true
