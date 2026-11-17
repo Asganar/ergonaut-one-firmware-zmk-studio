@@ -1,5 +1,5 @@
-# Draw keymap diagrams using keymap-drawer ZMK user config workflow
 name: Draw ZMK keymaps
+
 on:
   workflow_dispatch:
   push:
@@ -9,14 +9,30 @@ on:
       - keymap-drawer/config.yaml
       - .github/workflows/draw-keymaps.yml
 
+concurrency:
+  group: draw-keymaps-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   draw:
-    uses: caksoylar/keymap-drawer/.github/workflows/draw-zmk.yml@main
-    with:
-      keymap_patterns: 'config/*.keymap'
-      config_path: keymap-drawer/config.yaml
-      output_folder: keymap-drawer
-      install_branch: main
-      amend_commit: false
-      draw_args: "ergonaut_one:'-k corne_rotated -l LAYOUT_split_3x6_3'"
-      json_path: keymap-drawer/layouts
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Install keymap-drawer
+        run: python -m pip install keymap-drawer==0.23.0
+      - name: Generate the keymap diagram
+        run: |
+          keymap -c keymap-drawer/config.yaml parse -z config/ergonaut_one.keymap \
+            > keymap-drawer/ergonaut_one.yaml
+          keymap -c keymap-drawer/config.yaml draw keymap-drawer/ergonaut_one.yaml \
+            -k corne_rotated -l LAYOUT_split_3x6_3 > keymap-drawer/ergonaut_one.svg
+      - name: Commit the generated files
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: Update Ergonaut One keymap diagram
+          file_pattern: keymap-drawer/ergonaut_one.yaml keymap-drawer/ergonaut_one.svg
