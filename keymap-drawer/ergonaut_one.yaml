@@ -163,7 +163,7 @@ layers:
   - BT CLR
   - BT CLR ALL
   - ⏯
-  - ''
+  - '&studio_unlock'
   - Reset
   - F12
   - {t: ▽, type: trans}
